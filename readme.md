@@ -6,8 +6,8 @@ Generate study flashcards from any PDF using Large Language Models via Groq API.
 
 - Upload PDF file
 - Automatically extract key points
-- Generate 30+ flashcards in Q&A format
-- Download results in Markdown
+- Generate useful flashcards
+- Download results in PDF
 - Visually pleasing card-based interface
 
 ## 🛠️ Installation

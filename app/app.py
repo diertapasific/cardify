@@ -1,58 +1,184 @@
 import streamlit as st
-import tempfile
-import os
 from utils import extract_text_per_chunk
 from model import ask_model
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+import io
+import re
 
-st.set_page_config(page_title="Flashcard Generator", layout="wide")
-st.title("🔹 Flashcard Generator from PDF")
+st.set_page_config(page_title="Cardify")
+st.title("🧠 Cardify – AI Flashcard Generator from PDF")
 
-uploaded_file = st.file_uploader("Upload your PDF file", type="pdf")
-
+uploaded_file = st.file_uploader("📤 Upload a PDF file", type=["pdf"])
 if uploaded_file:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-        tmp_file.write(uploaded_file.read())
-        tmp_path = tmp_file.name
+    # Jika file baru diunggah, reset semua state yang berhubungan
+    if "last_file_name" not in st.session_state or st.session_state["last_file_name"] != uploaded_file.name:
+        st.session_state["last_file_name"] = uploaded_file.name
+        st.session_state.pop("chunks", None)
+        st.session_state.pop("flashcards", None)
+        st.session_state.pop("important_points", None)
+        st.session_state.pop("raw_output", None)
 
-    st.success("PDF uploaded successfully.")
-    chunks = extract_text_per_chunk(tmp_path, pages_per_chunk=10)
+# Extract text once and cache in session_state
+if uploaded_file and "chunks" not in st.session_state:
+    with st.spinner("🔍 Extracting text from PDF..."):
+        try:
+            st.session_state["chunks"] = extract_text_per_chunk(uploaded_file)
+        except Exception as e:
+            st.error(f"❌ Failed to read PDF: {e}")
 
-    st.info(f"Total chunks: {len(chunks)}. Generating notes...")
+# Generate Flashcards
+if st.button("🚀 Generate Flashcards"):
+    if "chunks" not in st.session_state:
+        st.warning("⚠️ Please upload a PDF first.")
+    else:
+        st.session_state["flashcards"] = []
+        st.session_state["important_points"] = []
+        st.session_state["raw_output"] = ""
 
-    all_points = []
-    for i, chunk in enumerate(chunks):
-        with st.spinner(f"Processing chunk {i+1}..."):
-            prompt = f"""
-            Ambil 3–5 poin penting dari teks berikut ini. Gunakan format poin bullet:
+        chunks = st.session_state["chunks"]
+        progress_bar = st.progress(0, text="🤖 Analyzing content...")
+        important_points = []
 
-            {chunk[:3000]}
-            """
-            result = ask_model(prompt)
-            all_points.append(result)
+        for idx, chunk in enumerate(chunks):
+            try:
+                prompt = f"""
+                Dari teks berikut, ambil poin poin penting yang mencakup informasi utama, insight, atau fakta penting. 
+                Tulis dalam bentuk bullet point yang singkat dan jelas. Gunakan bahasa Indonesia yang formal dan mudah dipahami. 
+                Hindari mengulang informasi dan jangan menambahkan hal yang tidak disebutkan dalam teks.
 
-    combined = "\n".join(all_points)
+                Teks:
+                \"\"\"
+                {chunk[:3000]}
+                \"\"\"
+                """
+                result = ask_model(prompt)
+                important_points.append(result.strip())
+            except Exception:
+                continue
+            progress_bar.progress((idx + 1) / len(chunks))
 
-    with st.spinner("Generating flashcards..."):
-        card_prompt = f"""
-        Buat 30 flashcards dalam format Q&A berdasarkan poin-poin penting berikut:
+        progress_bar.empty()
 
-        {combined}
+        combined_notes = "\n".join(important_points)
+        max_chars = 6000
+        if len(combined_notes) > max_chars:
+            combined_notes = combined_notes[:max_chars].rsplit("\n", 1)[0]  # pastikan tidak memotong di tengah baris
 
-        Gunakan format Markdown seperti ini:
+        st.session_state["important_points"] = important_points
 
-        Card 1
+        with st.spinner("📚 Generating Flashcards..."):
+            flashcard_prompt = f"""
+Buatlah flashcards berdasarkan poin-poin berikut:
 
-        **Question**  
-        Apa itu X?
+{combined_notes}
 
-        **Answer**  
-        X adalah ...
-        """
-        cards = ask_model(card_prompt)
+Format bebas, cukup pisahkan setiap flashcard dengan dua baris kosong.
+Jangan gunakan format QnA. Tampilkan setiap flashcard sebagai satu paragraf atau poin penting.
+Jangan beri pembuka seperti "Here are..." atau "Berikut adalah..."
+Pastikan setiap flashcard tidak lebih dari 1 kalimat ringkas.
+Tolong gunakan Bahasa Indonesia.
+"""
+            try:
+                flashcard_result = ask_model(flashcard_prompt)
+                st.session_state["raw_output"] = flashcard_result
 
-    st.subheader("📖 Flashcards")
-    for card in cards.split("Card ")[1:]:
-        st.markdown(f"### Card {card[:card.find('\n')]}")
-        st.markdown(card[card.find('\n')+1:])
+                raw_blocks = flashcard_result.strip().split("\n\n")
 
-    st.download_button("Download Flashcards", cards, file_name="flashcards.md", mime="text/markdown")
+                flashcards = []
+                for block in raw_blocks:
+                    block = block.strip()
+
+                    # Buang card yang berupa pembuka (Card 1 palsu)
+                    if re.match(r'^(here|berikut|this|these)\b', block.lower()):
+                        continue
+
+                    # Ambil hanya satu kalimat pertama
+                    sentence = re.split(r'[.?!]', block)[0].strip()
+                    if len(sentence) > 0:
+                        flashcards.append(sentence + ".")
+
+                if not flashcards:
+                    st.error("❌ Tidak ada flashcard yang valid dihasilkan.")
+                else:
+                    st.session_state["flashcards"] = flashcards
+                    st.success(f"✅ {len(flashcards)} flashcards berhasil dibuat!")
+
+            except Exception as e:
+                st.error(f"❌ Gagal membuat flashcards: {e}")
+
+# PDF Generator
+def wrap_text(text, max_width, canvas, font_name="Helvetica", font_size=11):
+    words = text.split()
+    lines = []
+    current_line = ""
+
+    for word in words:
+        test_line = f"{current_line} {word}".strip()
+        if canvas.stringWidth(test_line, font_name, font_size) <= max_width:
+            current_line = test_line
+        else:
+            lines.append(current_line)
+            current_line = word
+
+    if current_line:
+        lines.append(current_line)
+    return lines
+
+def generate_pdf(flashcards):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    left_margin = 50
+    right_margin = 50
+    usable_width = width - left_margin - right_margin
+    y = height - 50
+
+    for idx, card in enumerate(flashcards):
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(left_margin, y, f"Card {idx+1}:")
+        y -= 18
+
+        c.setFont("Helvetica", 11)
+        wrapped_lines = wrap_text(card, usable_width, c)
+
+        for line in wrapped_lines:
+            c.drawString(left_margin, y, line)
+            y -= 15
+            if y < 80:
+                c.showPage()
+                y = height - 50
+                c.setFont("Helvetica", 11)
+
+        y -= 25
+        if y < 80:
+            c.showPage()
+            y = height - 50
+
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+# Display Flashcards and Download Button
+if "flashcards" in st.session_state and st.session_state["flashcards"]:
+    st.subheader("📥 Download Flashcards")
+    pdf_data = generate_pdf(st.session_state["flashcards"])
+    st.download_button(
+        label="📄 Download Flashcards as PDF",
+        data=pdf_data,
+        file_name="flashcards.pdf",
+        mime="application/pdf"
+    )
+
+    st.subheader("🗂️ Your Flashcards")
+    for idx, card in enumerate(st.session_state["flashcards"]):
+        st.markdown(
+            f"""
+            <div style='background-color:#f9f9f9; padding:20px; border-radius:10px;
+                        box-shadow:0 2px 6px rgba(0,0,0,0.1); margin-bottom:15px'>
+                <strong>Card {idx+1}</strong><br><br>
+                <span>{card}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
