@@ -172,13 +172,17 @@ if "flashcards" in st.session_state and st.session_state["flashcards"]:
 
     st.subheader("🗂️ Your Flashcards")
     for idx, card in enumerate(st.session_state["flashcards"]):
-        st.markdown(
-            f"""
-            <div style='background-color:#f9f9f9; padding:20px; border-radius:10px;
-                        box-shadow:0 2px 6px rgba(0,0,0,0.1); margin-bottom:15px'>
+            st.markdown(f"""
+            <div style='
+                padding: 20px;
+                border-radius: 10px;
+                border: 1px solid #F0F2F6;
+                margin-bottom: 15px;
+            '>
                 <strong>Card {idx+1}</strong><br><br>
                 <span>{card}</span>
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+            """, unsafe_allow_html=True)
+
+
+
