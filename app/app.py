@@ -103,13 +103,13 @@ Gunakan Bahasa Indonesia.
                         flashcards.append(sentence + ".")
 
                 if not flashcards:
-                    st.error("❌ Tidak ada flashcard yang valid dihasilkan.")
+                    st.error("❌ No valid flashcard generated.")
                 else:
                     st.session_state["flashcards"] = flashcards
-                    st.success(f"✅ {len(flashcards)} flashcards berhasil dibuat!")
+                    st.success(f"✅ {len(flashcards)} flashcards generated!")
 
             except Exception as e:
-                st.error(f"❌ Gagal membuat flashcards: {e}")
+                st.error(f"❌ Failed to generate flashcards: {e}")
 
 # PDF Generator
 def wrap_text(text, max_width, canvas, font_name="Helvetica", font_size=11):
