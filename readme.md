@@ -1,6 +1,6 @@
 # 🧠 Flashcard Generator from PDF (LLM-powered)
 
-Generate study flashcards from any PDF using Large Language Models via Groq API. Built with Streamlit.
+Generate flashcards from any PDF using Large Language Models via Groq API. Built with Streamlit.
 
 ## 🚀 Features
 
@@ -10,16 +10,22 @@ Generate study flashcards from any PDF using Large Language Models via Groq API.
 - Download results in PDF
 - Visually pleasing card-based interface
 
+## 💻 Technology Used
+
+- Python
+- Streamlit
+- Groq API (LLM)
+- PyPDF
+- ReportLab
+
 ## 🛠️ Installation
 
 ```bash
-git clone https://github.com/username/flashcards-generator.git
-cd flashcards-generator
+git clone https://github.com/diertapasific/cardify.git
+cd cardify
 pip install -r requirements.txt
 ```
 
-## ▶️ Run the App
+## ▶️ App Demo
 
-```bash
-streamlit run app/main.py
-```
+Try the live demo: 👉 https://cardifyai.streamlit.app/
