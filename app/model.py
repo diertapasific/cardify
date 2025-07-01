@@ -14,7 +14,7 @@ if not API_KEY:
 
 client = Groq(api_key=API_KEY)
 
-def ask_model(prompt, model="llama3-70b-8192", temperature=0.5):
+def ask_model(prompt, model="llama3-70b-8192", temperature=0.1):
     messages = [{"role": "user", "content": prompt}]
     response = client.chat.completions.create(
         model=model,

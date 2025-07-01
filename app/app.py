@@ -7,9 +7,10 @@ import io
 import re
 
 st.set_page_config(page_title="Cardify")
-st.title("🧠 Cardify – AI Flashcard Generator from PDF")
+st.title("🧠 Cardify")
+st.subheader("AI Flashcard Generator from PDF")
 
-uploaded_file = st.file_uploader("📤 Upload a PDF file", type=["pdf"])
+uploaded_file = st.file_uploader("📤 Select and upload a PDF file to generate flashcards", type=["pdf"])
 if uploaded_file:
     # Jika file baru diunggah, reset semua state yang berhubungan
     if "last_file_name" not in st.session_state or st.session_state["last_file_name"] != uploaded_file.name:
@@ -37,17 +38,20 @@ if st.button("🚀 Generate Flashcards"):
         st.session_state["raw_output"] = ""
 
         chunks = st.session_state["chunks"]
-        progress_bar = st.progress(0, text="🤖 Analyzing content...")
+        progress_bar = st.progress(0, text="🤔 Analyzing content...")
         important_points = []
 
         for idx, chunk in enumerate(chunks):
             try:
                 prompt = f"""
-                Dari teks berikut, ambil poin poin penting yang mencakup informasi utama, insight, atau fakta penting. 
-                Tulis dalam bentuk bullet point yang singkat dan jelas. Gunakan bahasa Indonesia yang formal dan mudah dipahami. 
-                Hindari mengulang informasi dan jangan menambahkan hal yang tidak disebutkan dalam teks.
+                Dari teks berikut, identifikasi dan ringkas poin-poin penting yang memuat informasi utama, insight bermakna, atau fakta signifikan.
 
-                Teks:
+                • Sajikan dalam bentuk bullet point.
+                • Gunakan bahasa Indonesia yang formal, jelas, dan mudah dipahami.
+                • Setiap poin harus ringkas, padat, dan tidak mengulang informasi yang sama.
+                • Jangan menambahkan informasi yang tidak terdapat dalam teks.
+
+                Teks sumber:
                 \"\"\"
                 {chunk[:3000]}
                 \"\"\"
@@ -69,15 +73,15 @@ if st.button("🚀 Generate Flashcards"):
 
         with st.spinner("📚 Generating Flashcards..."):
             flashcard_prompt = f"""
-Buatlah flashcards berdasarkan poin-poin berikut:
+Dari teks berikut, buatlah daftar flashcard. Setiap flashcard harus berisi satu poin atau konsep kunci, diringkas dalam satu kalimat singkat dan padat.
 
 {combined_notes}
 
-Format bebas, cukup pisahkan setiap flashcard dengan dua baris kosong.
-Jangan gunakan format QnA. Tampilkan setiap flashcard sebagai satu paragraf atau poin penting.
-Jangan beri pembuka seperti "Here are..." atau "Berikut adalah..."
-Pastikan setiap flashcard tidak lebih dari 1 kalimat ringkas.
-Tolong gunakan Bahasa Indonesia.
+Pisahkan setiap flashcard dengan dua baris kosong.
+Jangan gunakan format tanya jawab.
+Jangan sertakan awalan atau pembuka.
+Pastikan setiap flashcard hanya berisi satu kalimat.
+Gunakan Bahasa Indonesia.
 """
             try:
                 flashcard_result = ask_model(flashcard_prompt)
